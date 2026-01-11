@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karakter Arşivi</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --text-sec: #b0b0b0;
+            --accent: #ff4081; /* Canlı bir pembe/kırmızı tonu */
+            --modal-bg: rgba(0, 0, 0, 0.95);
+            --border-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Yükleme Ekranı */
+        #loader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .spinner {
+            border: 4px solid #333;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Üst Bar */
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        h1 { margin: 0 0 10px 0; color: #fff; }
+
+        select {
+            padding: 12px;
+            border-radius: 6px;
+            background-color: #2c2c2c;
+            color: white;
+            border: 1px solid #444;
+            font-size: 16px;
+            min-width: 300px;
+            cursor: pointer;
+        }
+        select:focus { outline: 2px solid var(--accent); }
+
+        /* Izgara */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        /* Kart */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .card img {
+            width: 100%;
+            height: 240px;
+            object-fit: cover;
+            background-color: #000;
+        }
+        .card-content { padding: 10px; }
+        .card-name {
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+        .card-tags {
+            font-size: 0.75em;
+            color: var(--text-sec);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-bg);
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background-color: var(--card-bg);
+            width: 95%;
+            max-width: 1100px;
+            height: 90vh;
+            border-radius: 12px;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
+            border: 1px solid #444;
+        }
+        .modal-left {
+            width: 35%;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-left img { width: 100%; height: 100%; object-fit: contain; }
+        .modal-right {
+            width: 65%;
+            padding: 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 40px;
+            color: #fff;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .close-btn:hover { color: var(--accent); }
+
+        /* Taglar */
+        .modal-tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
+        .tag-badge {
+            background: #333; color: #fff; padding: 4px 8px;
+            border-radius: 4px; font-size: 0.8em; border: 1px solid #555;
+        }
+
+        /* Alanlar */
+        .field-block {
+            background: #252525; padding: 15px;
+            border-radius: 8px; border-left: 4px solid var(--accent);
+        }
+        .field-title {
+            font-weight: bold; color: #fff; margin-bottom: 8px;
+            display: block; text-transform: uppercase; font-size: 0.75em; opacity: 0.8;
+        }
+        .field-content {
+            white-space: pre-wrap; font-size: 0.95em; line-height: 1.6;
+            color: #d0d0d0; font-family: Consolas, monospace;
+        }
+
+        @media (max-width: 768px) {
+            .modal-content { flex-direction: column; }
+            .modal-left { width: 100%; height: 300px; }
+            .modal-right { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Yükleme Ekranı -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <div id="loading-text">Veritabanı yükleniyor...</div>
+    </div>
+
+    <div class="header">
+        <h1>Karakter Arşivi</h1>
+        <div id="stats" style="color:#aaa; margin-bottom:10px;">Yükleniyor...</div>
+        
+        <!-- Filtreleme Dropdown -->
+        <select id="tagFilter" disabled>
+            <option value="all">Veri Yükleniyor...</option>
+        </select>
+    </div>
+
+    <div class="grid-container" id="gallery"></div>
+
+    <!-- Modal Yapısı -->
+    <div id="charModal" class="modal">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <div class="modal-left">
+                <img id="mImage" src="" alt="Karakter Görseli">
+            </div>
+            <div class="modal-right">
+                <h2 id="mName"></h2>
+                <div class="modal-tag-list" id="mTags"></div>
+                <div class="field-block" id="blockDesc"><span class="field-title">Description</span><div class="field-content" id="mDesc"></div></div>
+                <div class="field-block" id="blockPersonality"><span class="field-title">Personality</span><div class="field-content" id="mPersonality"></div></div>
+                <div class="field-block" id="blockScenario"><span class="field-title">Scenario</span><div class="field-content" id="mScenario"></div></div>
+                <div class="field-block" id="blockFirstMes"><span class="field-title">First Message</span><div class="field-content" id="mFirstMes"></div></div>
+                <div class="field-block" id="blockSystem"><span class="field-title">System Prompt</span><div class="field-content" id="mSystem"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gallery = document.getElementById('gallery');
+        const tagFilter = document.getElementById('tagFilter');
+        const modal = document.getElementById('charModal');
+        const loader = document.getElementById('loader');
+        const loadingText = document.getElementById('loading-text');
+        const statsDiv = document.getElementById('stats');
+
+        // Modal Elements
+        const mImage = document.getElementById('mImage');
+        const mName = document.getElementById('mName');
+        const mTags = document.getElementById('mTags');
+        const mDesc = document.getElementById('mDesc');
+        const mPersonality = document.getElementById('mPersonality');
+        const mScenario = document.getElementById('mScenario');
+        const mFirstMes = document.getElementById('mFirstMes');
+        const mSystem = document.getElementById('mSystem');
+
+        let loadedCharacters = [];
+        let tagCounts = {};
+
+        // Sayfa Yüklendiğinde Otomatik Başlat
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // database.json dosyasını çek
+                const response = await fetch('database.json');
+                
+                if (!response.ok) {
+                    throw new Error("Veritabanı dosyası (database.json) bulunamadı!");
+                }
+
+                // JSON dosyasının boyutu büyükse indirmesi sürebilir
+                const contentLength = response.headers.get('Content-Length');
+                if (contentLength) {
+                    const sizeMB = (contentLength / (1024 * 1024)).toFixed(2);
+                    loadingText.textContent = `Veritabanı indiriliyor... (${sizeMB} MB)`;
+                }
+
+                const data = await response.json();
+                loadingText.textContent = "Karakterler işleniyor...";
+                
+                // Verileri işle
+                processData(data);
+                
+                // Yükleme ekranını kapat
+                loader.style.display = 'none';
+
+            } catch (error) {
+                loadingText.textContent = "Hata: " + error.message;
+                loadingText.style.color = "red";
+            }
+        });
+
+        function processData(data) {
+            const fragment = document.createDocumentFragment();
+            
+            data.forEach(json => {
+                // Etiketleri işle
+                if (json.topics && Array.isArray(json.topics)) {
+                    json.topics.forEach(tag => {
+                        const cleanTag = tag.trim();
+                        tagCounts[cleanTag] = (tagCounts[cleanTag] || 0) + 1;
+                    });
+                }
+
+                const cardElement = createCard(json);
+                loadedCharacters.push({ data: json, element: cardElement });
+                fragment.appendChild(cardElement);
+            });
+
+            gallery.appendChild(fragment);
+            updateTagFilter();
+            statsDiv.textContent = `Toplam ${loadedCharacters.length} karakter listelendi.`;
+        }
+
+        function updateTagFilter() {
+            const sortedTags = Object.keys(tagCounts).sort();
+            tagFilter.innerHTML = `<option value="all">Tüm Etiketler (Filtrele)</option>`;
+            
+            sortedTags.forEach(tag => {
+                const count = tagCounts[tag];
+                const option = document.createElement('option');
+                option.value = tag;
+                option.textContent = `${tag} (${count})`;
+                tagFilter.appendChild(option);
+            });
+
+            tagFilter.disabled = false;
+            
+            // Filtreleme Dinleyicisi
+            tagFilter.addEventListener('change', (e) => {
+                const selectedTag = e.target.value;
+                let visibleCount = 0;
+                
+                // DOM manipülasyonunu minimuma indirmek için önce display'leri ayarla
+                loadedCharacters.forEach(charObj => {
+                    const charTags = charObj.data.topics || [];
+                    if (selectedTag === 'all' || charTags.includes(selectedTag)) {
+                        charObj.element.style.display = 'flex';
+                        visibleCount++;
+                    } else {
+                        charObj.element.style.display = 'none';
+                    }
+                });
+                statsDiv.textContent = selectedTag === 'all' 
+                    ? `Toplam ${loadedCharacters.length} karakter listelendi.`
+                    : `${selectedTag} etiketinde ${visibleCount} karakter bulundu.`;
+            });
+        }
+
+        function createCard(data) {
+            const div = document.createElement('div');
+            div.className = 'card';
+            
+            let imgSrc = 'https://via.placeholder.com/300x400?text=No+Image';
+            if(data.avatar_url) imgSrc = data.avatar_url;
+            else if(data.max_res_url) imgSrc = data.max_res_url;
+            else if(data.definition && data.definition.avatar) imgSrc = data.definition.avatar;
+
+            let tagsPreview = "";
+            if(data.topics && Array.isArray(data.topics)){
+                tagsPreview = data.topics.slice(0, 3).join(", ");
+                if(data.topics.length > 3) tagsPreview += " +";
+            }
+
+            div.innerHTML = `
+                <img src="${imgSrc}" loading="lazy" alt="${data.name}">
+                <div class="card-content">
+                    <div class="card-name">${data.name}</div>
+                    <div class="card-tags">${tagsPreview}</div>
+                </div>
+            `;
+
+            div.addEventListener('click', () => openModal(data, imgSrc));
+            return div;
+        }
+
+        function openModal(data, imgSrc) {
+            mImage.src = imgSrc;
+            mName.textContent = data.name;
+
+            mTags.innerHTML = '';
+            if (data.topics && Array.isArray(data.topics)) {
+                data.topics.forEach(tag => {
+                    const span = document.createElement('span');
+                    span.className = 'tag-badge';
+                    span.textContent = tag;
+                    mTags.appendChild(span);
+                });
+            }
+
+            const def = data.definition || {};
+            updateField('blockDesc', mDesc, data.description || def.description);
+            updateField('blockPersonality', mPersonality, def.personality);
+            updateField('blockScenario', mScenario, def.scenario);
+            updateField('blockFirstMes', mFirstMes, def.first_message);
+            updateField('blockSystem', mSystem, def.system_prompt);
+
+            modal.style.display = "flex";
+        }
+
+        function updateField(blockId, contentElement, text) {
+            const block = document.getElementById(blockId);
+            if (!text || text === "-" || text.trim() === "") {
+                block.style.display = "none";
+            } else {
+                block.style.display = "block";
+                contentElement.textContent = text;
+            }
+        }
+
+        function closeModal() { modal.style.display = "none"; }
+        window.onclick = function(event) { if (event.target == modal) closeModal(); }
+    </script>
+</body>
+</html>
